@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package papers.v1;
+
+option go_package = "github.com/larwef/papers-please/api/papers/v1";
+
+service PaperService {
+    rpc GetCertificate(GetCertificateRequest) returns (GetCertificateResponse) {}
+}
+
+message GetCertificateRequest {
+    // DER ecoded CSR.
+    bytes certificate_signing_request = 1;
+}
+
+message GetCertificateResponse {
+    // DER encoded certificate.
+    bytes certificate = 1;
+}
