@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
@@ -14,6 +17,7 @@ import (
 	greeter "github.com/larwef/papers-please/api/greeter/v1"
 	"github.com/larwef/papers-please/internal/server"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 // Version injected at compile time.
@@ -42,12 +46,15 @@ func realMain(ctx context.Context) error {
 
 	listener, err := net.Listen("tcp", conf.ServerAddr)
 	if err != nil {
-		return fmt.Errorf("failed to listen: %v", err)
+		return fmt.Errorf("failed to listen: %w", err)
 	}
 	defer listener.Close()
 
-	opts := []grpc.ServerOption{}
-	grpcSrv := grpc.NewServer(opts...)
+	tlsConf, err := getTLSConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get TLS config: %w", err)
+	}
+	grpcSrv := grpc.NewServer(grpc.Creds(credentials.NewTLS(tlsConf)))
 	greeter.RegisterGreeterServiceServer(grpcSrv, &server.Server{})
 
 	errCh := make(chan error)
@@ -64,4 +71,23 @@ func realMain(ctx context.Context) error {
 	case err := <-errCh:
 		return err
 	}
+}
+func getTLSConfig() (*tls.Config, error) {
+	certificate, err := tls.LoadX509KeyPair("server.crt", "server.key")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load server key pair: %w", err)
+	}
+	pemServerCA, err := ioutil.ReadFile("root.crt")
+	if err != nil {
+		return nil, err
+	}
+	certPool := x509.NewCertPool()
+	if !certPool.AppendCertsFromPEM(pemServerCA) {
+		return nil, fmt.Errorf("failed to append server CA cert: %w", err)
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{certificate},
+		ClientCAs:    certPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+	}, nil
 }

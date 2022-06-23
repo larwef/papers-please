@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -11,7 +15,7 @@ import (
 
 	greeter "github.com/larwef/papers-please/api/greeter/v1"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 )
 
 // Version injected at compile time.
@@ -39,10 +43,14 @@ func realMain(ctx context.Context) error {
 		return err
 	}
 
-	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
+	tlsConf, err := getTLSConfig()
+	if err != nil {
+		return fmt.Errorf("failed to get TLS config: %w", err)
+	}
+	opts := []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(tlsConf))}
 	conn, err := grpc.Dial(conf.GreeterAddr, opts...)
 	if err != nil {
-		log.Fatalf("failed to dial: %v", err)
+		return fmt.Errorf("failed to dial: %w", err)
 	}
 	defer conn.Close()
 
@@ -55,4 +63,23 @@ func realMain(ctx context.Context) error {
 	log.Println(res.Message)
 
 	return nil
+}
+
+func getTLSConfig() (*tls.Config, error) {
+	certificate, err := tls.LoadX509KeyPair("client.crt", "client.key")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load client key pair: %w", err)
+	}
+	pemServerCA, err := ioutil.ReadFile("root.crt")
+	if err != nil {
+		return nil, err
+	}
+	certPool := x509.NewCertPool()
+	if !certPool.AppendCertsFromPEM(pemServerCA) {
+		return nil, fmt.Errorf("failed to append server CA cert: %w", err)
+	}
+	return &tls.Config{
+		RootCAs:      certPool,
+		Certificates: []tls.Certificate{certificate},
+	}, nil
 }

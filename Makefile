@@ -1,10 +1,20 @@
-BUILD_VERSION=0.0.1
+BUILD_VERSION=0.0.2
 TARGET=target
 REPOSITORY=github.com/larwef/papers-please
 
 all:
+	make gencerts
+	cat intermediate.crt >> server.crt
+	cat intermediate.crt >> client.crt
 	make build
 	make docker
+
+# ---------------------------------- Openssl ----------------------------------
+printcert:
+	openssl x509 -in $(CERT_FILE) -text -noout
+
+gencerts:
+	go run cmd/certs/main.go
 
 # ----------------------------------- Proto -----------------------------------
 .PHONY: proto
