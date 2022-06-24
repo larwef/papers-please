@@ -48,13 +48,13 @@ func realMain(ctx context.Context) error {
 	}
 	defer listener.Close()
 
-	papersClient, err := papers.NewClient(conf.PapersAddr)
+	papersClient, err := papers.NewClient(conf.PapersAddr, "server@foo.com")
 	if err != nil {
 		return fmt.Errorf("failed to create papers client: %w", err)
 	}
 	tlsConf, err := papersClient.GetTLSConfig(ctx, &x509.CertificateRequest{
 		DNSNames: []string{"localhost", "server"},
-	})
+	}, []string{"client@foo.com"})
 	if err != nil {
 		return fmt.Errorf("failed to get TLS config: %w", err)
 	}

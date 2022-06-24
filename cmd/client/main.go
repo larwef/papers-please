@@ -43,15 +43,15 @@ func realMain(ctx context.Context) error {
 		return err
 	}
 
-	papersClient, err := papers.NewClient(conf.PapersAddr)
+	papersClient, err := papers.NewClient(conf.PapersAddr, "client@foo.com")
 	if err != nil {
 		return fmt.Errorf("failed to create papers client: %w", err)
 	}
-	tlsConf, err := papersClient.GetTLSConfig(ctx, &x509.CertificateRequest{})
+	tlsConf, err := papersClient.GetTLSConfig(ctx, &x509.CertificateRequest{}, []string{"server@foo.com"})
 	if err != nil {
 		return fmt.Errorf("failed to get TLS config: %w", err)
 	}
-	
+
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(credentials.NewTLS(tlsConf))}
 	conn, err := grpc.Dial(conf.GreeterAddr, opts...)
 	if err != nil {

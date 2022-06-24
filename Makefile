@@ -1,4 +1,4 @@
-BUILD_VERSION=0.0.3
+BUILD_VERSION=0.0.4
 TARGET=target
 REPOSITORY=github.com/larwef/papers-please
 

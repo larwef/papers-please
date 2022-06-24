@@ -9,10 +9,13 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"math/big"
+	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v4"
 	paperspb "github.com/larwef/papers-please/api/papers/v1"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -73,11 +76,28 @@ func (s *Server) GetCertificate(ctx context.Context, req *paperspb.GetCertificat
 	if req.GetCertificateSigningRequest() == nil {
 		return nil, status.Error(codes.InvalidArgument, "missing certificate signing request")
 	}
+	md, b := metadata.FromIncomingContext(ctx)
+	if !b {
+		return nil, status.Error(codes.InvalidArgument, "missing metadata")
+	}
+	token, err := jwt.Parse(strings.TrimPrefix(md["authorization"][0], "Bearer "), func(t *jwt.Token) (interface{}, error) {
+		return []byte("secret"), nil
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}))
+	if err != nil {
+		return nil, err
+	}
 	csr, err := x509.ParseCertificateRequest(req.GetCertificateSigningRequest())
 	if err != nil {
 		return nil, err
 	}
-	template, err := csrToTemplate(csr)
+	if !token.Valid {
+		return nil, status.Error(codes.Unauthenticated, "invalid token")
+	}
+	email, exists := token.Claims.(jwt.MapClaims)["email"].(string)
+	if !exists {
+		return nil, status.Error(codes.Unauthenticated, "invalid token, missing email claim")
+	}
+	template, err := csrToTemplate(csr, email)
 	if err != nil {
 		return nil, err
 	}
@@ -94,12 +114,13 @@ func (s *Server) GetCertificate(ctx context.Context, req *paperspb.GetCertificat
 	}, nil
 }
 
-func csrToTemplate(csr *x509.CertificateRequest) (*x509.Certificate, error) {
+func csrToTemplate(csr *x509.CertificateRequest, email string) (*x509.Certificate, error) {
 	return &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		NotBefore:    time.Now(),
-		NotAfter:     time.Now().Add(time.Hour * 24),
-		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		DNSNames:     csr.DNSNames,
+		SerialNumber:   big.NewInt(1),
+		NotBefore:      time.Now(),
+		NotAfter:       time.Now().Add(time.Hour * 24),
+		KeyUsage:       x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		DNSNames:       csr.DNSNames,
+		EmailAddresses: []string{email},
 	}, nil
 }
