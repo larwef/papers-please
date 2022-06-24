@@ -2,6 +2,7 @@ package papers
 
 import (
 	"context"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -17,12 +18,23 @@ import (
 
 type Server struct {
 	paperspb.UnimplementedPaperServiceServer
-	caKey         *ecdsa.PrivateKey
+
+	caKey         crypto.PrivateKey
 	caCrtPem      []byte
 	caCertificate *x509.Certificate
 }
 
-func New() (*Server, error) {
+// Helper function making poc easier.
+func NewWithGeneratedKeyPair() (*Server, error) {
+	caKey, caCrt, err := GenerateKeyPair()
+	if err != nil {
+		return nil, err
+	}
+	return New(caKey, caCrt)
+}
+
+// Helper function making poc easier.
+func GenerateKeyPair() (*ecdsa.PrivateKey, *x509.Certificate, error) {
 	caCertTemplate := &x509.Certificate{
 		SerialNumber:          big.NewInt(1),
 		NotBefore:             time.Now(),
@@ -33,23 +45,27 @@ func New() (*Server, error) {
 	}
 	caCerPrivateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	caCertBytes, err := x509.CreateCertificate(rand.Reader, caCertTemplate, caCertTemplate, &caCerPrivateKey.PublicKey, caCerPrivateKey)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	caCert, err := x509.ParseCertificate(caCertBytes)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+	return caCerPrivateKey, caCert, nil
+}
+
+func New(key crypto.PrivateKey, crt *x509.Certificate) (*Server, error) {
 	return &Server{
-		caKey: caCerPrivateKey,
+		caKey: key,
 		caCrtPem: pem.EncodeToMemory(&pem.Block{
 			Type:  "CERTIFICATE",
-			Bytes: caCertBytes,
+			Bytes: crt.Raw,
 		}),
-		caCertificate: caCert,
+		caCertificate: crt,
 	}, nil
 }
 
@@ -61,12 +77,9 @@ func (s *Server) GetCertificate(ctx context.Context, req *paperspb.GetCertificat
 	if err != nil {
 		return nil, err
 	}
-	template := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		NotBefore:    time.Now(),
-		NotAfter:     time.Now().Add(time.Hour * 24),
-		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
-		DNSNames:     csr.DNSNames,
+	template, err := csrToTemplate(csr)
+	if err != nil {
+		return nil, err
 	}
 	cert, err := x509.CreateCertificate(rand.Reader, template, s.caCertificate, csr.PublicKey, s.caKey)
 	if err != nil {
@@ -78,5 +91,15 @@ func (s *Server) GetCertificate(ctx context.Context, req *paperspb.GetCertificat
 			Bytes: cert,
 		}),
 		CaCertificates: [][]byte{s.caCrtPem},
+	}, nil
+}
+
+func csrToTemplate(csr *x509.CertificateRequest) (*x509.Certificate, error) {
+	return &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().Add(time.Hour * 24),
+		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		DNSNames:     csr.DNSNames,
 	}, nil
 }

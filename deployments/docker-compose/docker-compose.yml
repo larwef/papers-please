@@ -14,6 +14,8 @@ services:
       - ${SERVER_PORT}:${SERVER_PORT}
     networks:
       - papersPleaseNetwork
+    depends_on:
+      - papers
   client:
     image: github.com/larwef/papers-please/client:${VERSION}
     environment:
@@ -23,5 +25,7 @@ services:
       - ${CLIENT_PORT}:${CLIENT_PORT}
     networks:
       - papersPleaseNetwork
+    depends_on:
+      - papers
 networks:
   papersPleaseNetwork: {}

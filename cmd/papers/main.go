@@ -47,7 +47,7 @@ func realMain(ctx context.Context) error {
 
 	opts := []grpc.ServerOption{}
 	grpcSrv := grpc.NewServer(opts...)
-	papers, err := papers.New()
+	papers, err := papers.NewWithGeneratedKeyPair()
 	if err != nil {
 		return fmt.Errorf("failed to create papers: %w", err)
 	}
