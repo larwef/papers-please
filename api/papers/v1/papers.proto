@@ -14,8 +14,8 @@ message GetCertificateRequest {
 }
 
 message GetCertificateResponse {
-    // DER encoded certificate.
+    // PEM encoded certificate.
     bytes certificate = 1;
-    // DER encoded CA certificates.
+    // PEM encoded CA certificates.
     repeated bytes ca_certificates = 2;
 }

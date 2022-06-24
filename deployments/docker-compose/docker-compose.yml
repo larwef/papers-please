@@ -1,9 +1,15 @@
 version: "3.9"
 services:
+  papers:
+    image: github.com/larwef/papers-please/papers:${VERSION}
+    ports:
+      - ${PAPERS_PORT}:${PAPERS_PORT}
+    networks:
+      - papersPleaseNetwork
   server:
     image: github.com/larwef/papers-please/server:${VERSION}
     environment:
-      - SERVER_PORT=${SERVER_PORT}
+      - CLIENT_PAPERS_ADDR=papers:${PAPERS_PORT}
     ports:
       - ${SERVER_PORT}:${SERVER_PORT}
     networks:
@@ -11,6 +17,7 @@ services:
   client:
     image: github.com/larwef/papers-please/client:${VERSION}
     environment:
+      - CLIENT_PAPERS_ADDR=papers:${PAPERS_PORT}
       - CLIENT_GREETER_ADDR=server:${SERVER_PORT}
     ports:
       - ${CLIENT_PORT}:${CLIENT_PORT}

@@ -1,20 +1,14 @@
-BUILD_VERSION=0.0.2
+BUILD_VERSION=0.0.3
 TARGET=target
 REPOSITORY=github.com/larwef/papers-please
 
 all:
-	make gencerts
-	cat intermediate.crt >> server.crt
-	cat intermediate.crt >> client.crt
 	make build
 	make docker
 
 # ---------------------------------- Openssl ----------------------------------
 printcert:
 	openssl x509 -in $(CERT_FILE) -text -noout
-
-gencerts:
-	go run cmd/certs/main.go
 
 # ----------------------------------- Proto -----------------------------------
 .PHONY: proto
@@ -32,7 +26,8 @@ proto-mod-update:
 # ------------------------------------- Go -------------------------------------
 .PHONY: build
 build:
-	make build-app APP=server 
+	make build-app APP=papers
+	make build-app APP=server
 	make build-app APP=client
 
 build-app:
@@ -41,6 +36,7 @@ build-app:
 		-o $(TARGET)/$(APP).bin cmd/$(APP)/main.go
 
 run-client:
+	CLIENT_PAPERS_ADDR=localhost:8083 \
 	CLIENT_GREETER_ADDR=localhost:8081 \
 	CLIENT_NAME=Lars \
 	go run cmd/client/main.go
@@ -48,6 +44,7 @@ run-client:
 # ---------------------------------- Docker -----------------------------------
 .PHONY: docker
 docker:
+	make docker-build-app APP=papers
 	make docker-build-app APP=server
 	make docker-build-app APP=client
 
@@ -59,10 +56,12 @@ compose-up:
 	VERSION=$(BUILD_VERSION) \
 	SERVER_PORT=8081 \
 	CLIENT_PORT=8082 \
+	PAPERS_PORT=8083 \
 		docker compose -f deployments/docker-compose/docker-compose.yml up
 
 compose-down:
 	VERSION=$(BUILD_VERSION) \
 	SERVER_PORT=8081 \
 	CLIENT_PORT=8082 \
+	PAPERS_PORT=8083 \
 		docker compose -f deployments/docker-compose/docker-compose.yml down

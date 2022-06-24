@@ -73,9 +73,9 @@ type GetCertificateResponse struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// DER encoded certificate.
+	// PEM encoded certificate.
 	Certificate []byte `protobuf:"bytes,1,opt,name=certificate,proto3" json:"certificate,omitempty"`
-	// DER encoded CA certificates.
+	// PEM encoded CA certificates.
 	CaCertificates [][]byte `protobuf:"bytes,2,rep,name=ca_certificates,json=caCertificates,proto3" json:"ca_certificates,omitempty"`
 }
 

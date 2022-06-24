@@ -41,13 +41,17 @@ func realMain(ctx context.Context) error {
 
 	listener, err := net.Listen("tcp", conf.Addr)
 	if err != nil {
-		return fmt.Errorf("failed to listen: %v", err)
+		return fmt.Errorf("failed to listen: %w", err)
 	}
 	defer listener.Close()
 
 	opts := []grpc.ServerOption{}
 	grpcSrv := grpc.NewServer(opts...)
-	paperspb.RegisterPaperServiceServer(grpcSrv, &papers.Server{})
+	papers, err := papers.New()
+	if err != nil {
+		return fmt.Errorf("failed to create papers: %w", err)
+	}
+	paperspb.RegisterPaperServiceServer(grpcSrv, papers)
 
 	errCh := make(chan error)
 	go func() {
