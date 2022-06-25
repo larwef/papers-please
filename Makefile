@@ -1,10 +1,11 @@
-BUILD_VERSION=0.0.4
+BUILD_VERSION=0.0.5
 TARGET=target
 REPOSITORY=github.com/larwef/papers-please
 
 all:
 	make build
 	make docker
+	make compose-up
 
 # ---------------------------------- Openssl ----------------------------------
 printcert:

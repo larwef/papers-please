@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"strings"
 	"time"
@@ -76,28 +77,30 @@ func (s *Server) GetCertificate(ctx context.Context, req *paperspb.GetCertificat
 	if req.GetCertificateSigningRequest() == nil {
 		return nil, status.Error(codes.InvalidArgument, "missing certificate signing request")
 	}
+
+	// Fetching, parsing and validating token from metadata.
 	md, b := metadata.FromIncomingContext(ctx)
 	if !b {
 		return nil, status.Error(codes.InvalidArgument, "missing metadata")
 	}
-	token, err := jwt.Parse(strings.TrimPrefix(md["authorization"][0], "Bearer "), func(t *jwt.Token) (interface{}, error) {
+	tokenString := strings.TrimPrefix(md["authorization"][0], "Bearer ")
+	var claims CustomClaims
+	token, err := jwt.ParseWithClaims(tokenString, &claims, func(t *jwt.Token) (interface{}, error) {
 		return []byte("secret"), nil
 	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}))
-	if err != nil {
-		return nil, err
-	}
-	csr, err := x509.ParseCertificateRequest(req.GetCertificateSigningRequest())
 	if err != nil {
 		return nil, err
 	}
 	if !token.Valid {
 		return nil, status.Error(codes.Unauthenticated, "invalid token")
 	}
-	email, exists := token.Claims.(jwt.MapClaims)["email"].(string)
-	if !exists {
-		return nil, status.Error(codes.Unauthenticated, "invalid token, missing email claim")
+
+	// Parse CSR, create a certificate and return the certificate to the client.
+	csr, err := x509.ParseCertificateRequest(req.GetCertificateSigningRequest())
+	if err != nil {
+		return nil, err
 	}
-	template, err := csrToTemplate(csr, email)
+	template, err := csrToTemplate(csr, claims.Email)
 	if err != nil {
 		return nil, err
 	}
@@ -123,4 +126,19 @@ func csrToTemplate(csr *x509.CertificateRequest, email string) (*x509.Certificat
 		DNSNames:       csr.DNSNames,
 		EmailAddresses: []string{email},
 	}, nil
+}
+
+type CustomClaims struct {
+	jwt.RegisteredClaims
+	Email string `json:"email,omitempty"`
+}
+
+func (c *CustomClaims) Valid() error {
+	if err := c.RegisteredClaims.Valid(); err != nil {
+		return err
+	}
+	if c.Email == "" {
+		return fmt.Errorf("Email is required")
+	}
+	return nil
 }

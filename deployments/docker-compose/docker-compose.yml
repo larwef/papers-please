@@ -27,5 +27,6 @@ services:
       - papersPleaseNetwork
     depends_on:
       - papers
+      - server
 networks:
   papersPleaseNetwork: {}

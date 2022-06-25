@@ -13,6 +13,7 @@ message GetCertificateRequest {
     bytes certificate_signing_request = 1;
 }
 
+// PEM encoding on these fields because it makes it much easier for the client.
 message GetCertificateResponse {
     // PEM encoded certificate.
     bytes certificate = 1;

@@ -78,23 +78,32 @@ func (c *Client) GetTLSConfig(ctx context.Context, csrTemplate *x509.Certificate
 			return nil, fmt.Errorf("failed to append server CA cert: %w", err)
 		}
 	}
-
+	// This config will work for both client and server.
 	return &tls.Config{
-		RootCAs: certPool,
+		RootCAs:   certPool,
+		ClientCAs: certPool,
 		// This is called AFTER normal certificate verification. Doesn't
 		// override the default.
-		VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-			leaf := verifiedChains[0][0]
-			if len(leaf.EmailAddresses) != 1 {
-				return fmt.Errorf("expected certificate to contain a single email but got %d", len(leaf.EmailAddresses))
-			}
-			if !contains(leaf.EmailAddresses[0], expectedEmails) {
-				return fmt.Errorf("email address %s does not match any expected emails: %v", leaf.EmailAddresses[0], expectedEmails)
-			}
-			return nil
-		},
-		Certificates: []tls.Certificate{certificate},
+		VerifyPeerCertificate: verifyPeerCertificate(expectedEmails),
+		Certificates:          []tls.Certificate{certificate},
+		ClientAuth:            tls.RequireAndVerifyClientCert,
 	}, nil
+}
+
+func verifyPeerCertificate(expectedEmails []string) func([][]byte, [][]*x509.Certificate) error {
+	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+		leaf := verifiedChains[0][0]
+		if len(leaf.EmailAddresses) != 1 {
+			return fmt.Errorf("expected certificate to contain a single email but got %d", len(leaf.EmailAddresses))
+		}
+		if !contains(leaf.EmailAddresses[0], expectedEmails) {
+			// Consider logging here. A client will log the returned error,
+			// but a server will not. Could make it har to debug if the
+			// server expected emails is configured improperly.
+			return fmt.Errorf("email address %s does not match any expected emails: %v", leaf.EmailAddresses[0], expectedEmails)
+		}
+		return nil
+	}
 }
 
 func contains(elem string, slice []string) bool {
