@@ -48,7 +48,7 @@ func realMain(ctx context.Context) error {
 	}
 	defer listener.Close()
 
-	papersClient, err := papers.NewClient(conf.PapersAddr, "server@foo.com")
+	papersClient, err := papers.NewClient(conf.PapersAddr, "server@bar.com")
 	if err != nil {
 		return fmt.Errorf("failed to create papers client: %w", err)
 	}
